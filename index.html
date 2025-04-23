@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Rani PDF Reader with Images</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #fff;
+      color: #333;
+      margin: 0;
+      padding: 0;
+    }
+    header {
+      text-align: center;
+      padding: 1rem;
+      background: #eee;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    main {
+      padding: 1rem;
+      max-width: 800px;
+      margin: auto;
+    }
+    #controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin: 1rem 0;
+    }
+    canvas {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      box-shadow: 0 0 8px rgba(0,0,0,0.05);
+    }
+    button {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    input[type="file"] {
+      margin: 1rem 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📘 Rani's PDF Reader with Voice</h1>
+    <p>See and hear each page with full visuals 🖼️🔊</p>
+  </header>
+  <main>
+    <input type="file" id="fileInput" accept="application/pdf" />
+    <div id="controls" style="display:none;">
+      <button onclick="prevPage()">⏮️ Prev</button>
+      <span id="pageInfo">Page 1</span>
+      <button onclick="nextPage()">Next ⏭️</button>
+      <button onclick="readPage()">🔊 Listen</button>
+    </div>
+    <canvas id="pdfCanvas"></canvas>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script>
+    let pdfDoc = null, pageNum = 1, totalPages = 0;
+    const canvas = document.getElementById("pdfCanvas");
+    const ctx = canvas.getContext("2d");
+    const fileInput = document.getElementById("fileInput");
+    const pageInfo = document.getElementById("pageInfo");
+    const controls = document.getElementById("controls");
+
+    fileInput.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file || file.type !== "application/pdf") return alert("Please select a PDF file.");
+      if (file.size > 50 * 1024 * 1024) return alert("File too large! Max 50MB.");
+
+      const fileReader = new FileReader();
+      fileReader.onload = async function() {
+        const typedarray = new Uint8Array(this.result);
+        pdfDoc = await pdfjsLib.getDocument({ data: typedarray }).promise;
+        totalPages = pdfDoc.numPages;
+        pageNum = 1;
+        controls.style.display = "flex";
+        renderPage();
+      };
+      fileReader.readAsArrayBuffer(file);
+    });
+
+    async function renderPage() {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      const renderContext = {
+        canvasContext: ctx,
+        viewport: viewport
+      };
+      await page.render(renderContext).promise;
+
+      pageInfo.textContent = `Page ${pageNum} of ${totalPages}`;
+    }
+
+    function prevPage() {
+      if (pageNum <= 1) return;
+      pageNum--;
+      renderPage();
+    }
+
+    function nextPage() {
+      if (pageNum >= totalPages) return;
+      pageNum++;
+      renderPage();
+    }
+
+    async function readPage() {
+      const page = await pdfDoc.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(" ");
+      const utterance = new SpeechSynthesisUtterance(pageText);
+      utterance.lang = "en-US";
+      utterance.rate = 1;
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utterance);
+    }
+  </script>
+</body>
+</html>
